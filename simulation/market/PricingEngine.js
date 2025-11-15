@@ -11,32 +11,34 @@ export class PricingEngine {
 
   /**
    * Calculate new price based on demand and supply
-   * Formula: price_delta = 0.01 * (demand - supply) + noise
+   * Formula: price_delta = 0.05 * (demand - supply) + noise
    * Then: price_next = price_current * (1 + price_delta)
    * Then clamp(price_next, min, max)
    * 
-   * @param {number} demand - Total units demanded this tick
-   * @param {number} supply - Expected baseline supply per tick
+   * @param {number} demand - Total units demanded this tick (net: buys - sells)
+   * @param {number} supply - Expected baseline supply per tick (equilibrium point)
    * @param {number} currentPrice - Current price per unit
    * @returns {number} New price (clamped to min/max)
    */
   calculatePriceChange(demand, supply, currentPrice) {
     // Fixed baseline supply expectation (equilibrium point)
-    // This represents "normal" demand level where price stays stable
-    const baselineSupply = supply > 0 ? supply : 3;
+    // Set to 0 for maximum sensitivity - any net buying/selling moves price
+    const baselineSupply = supply > 0 ? supply : 0;
     
     // Calculate raw imbalance
-    // Positive = more demand than expected → price up
-    // Negative = less demand than expected → price down
+    // Positive = net buying pressure → price up
+    // Negative = net selling pressure → price down
+    // Zero = balanced → price stable (plus noise)
     const imbalance = demand - baselineSupply;
     
     // Scale the imbalance to percentage change
-    // 0.01 = 1% price change per unit of imbalance
-    // Example: If demand=10 and baseline=3, imbalance=7 → 7% price increase
-    const baseDelta = imbalance * 0.01;
+    // 0.05 = 5% price change per unit of net imbalance
+    // Example: If net demand = +4, price increases 20%
+    // Example: If net demand = -3, price decreases 15%
+    const baseDelta = imbalance * 0.05;
     
-    // Add noise for volatility: random between -0.5% and +0.5%
-    const noise = (Math.random() - 0.5) * 0.01;
+    // Add noise for volatility: random between -1% and +1%
+    const noise = (Math.random() - 0.5) * 0.02;
     
     const priceDelta = baseDelta + noise;
     

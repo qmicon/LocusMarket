@@ -10,16 +10,16 @@
 /**
  * @typedef {Object} AgentPreferences
  * @property {string} good - The product being traded (e.g., 'apple')
- * @property {number} max_qty_per_tick - Maximum units that can be purchased per tick
+ * @property {number} max_spend_percent - Maximum percentage of balance to spend per tick (0.0-1.0)
  * @property {number} [threshold] - Price threshold (used by frugal buyer)
  */
 
 /**
  * @typedef {Object} ActionRecord
  * @property {number} tick - Tick number when action occurred
- * @property {'buy' | 'wait'} action - Action taken
- * @property {number} qty - Quantity purchased (0 if wait)
- * @property {number} [price] - Price at time of purchase
+ * @property {'buy' | 'sell' | 'wait'} action - Action taken
+ * @property {number} qty - Quantity purchased or sold (0 if wait)
+ * @property {number} [price] - Price at time of transaction
  * @property {string} [note] - Reasoning for the decision
  */
 
@@ -32,10 +32,13 @@
 
 /**
  * @typedef {Object} AgentLongTerm
- * @property {number} total_spent - Total USDC spent
+ * @property {number} total_spent - Total USDC spent on purchases
  * @property {number} total_qty_bought - Total units purchased
  * @property {number} avg_purchase_price - Average price paid per unit
  * @property {number} max_single_tick_purchase - Largest single purchase
+ * @property {number} total_revenue - Total USDC earned from sales
+ * @property {number} total_qty_sold - Total units sold
+ * @property {number} realized_profit - Net profit/loss (revenue - spent)
  */
 
 /**
@@ -61,8 +64,8 @@
 
 /**
  * @typedef {Object} AgentDecision
- * @property {'buy' | 'wait'} action - Action to take
- * @property {number} quantity - Quantity to purchase
+ * @property {'buy' | 'sell' | 'wait'} action - Action to take
+ * @property {number} quantity - Quantity to purchase or sell
  * @property {string} note - Reasoning for decision
  */
 
@@ -81,10 +84,11 @@
  * @property {number} tick - Tick when transaction occurred
  * @property {string} agent_id - Agent ID
  * @property {string} agent_name - Agent name
- * @property {number} quantity - Units purchased
+ * @property {'buy' | 'sell'} action - Transaction type (buy or sell)
+ * @property {number} quantity - Units purchased or sold
  * @property {number} price - Price per unit
- * @property {number} total_cost - Total cost (price * quantity)
- * @property {string} note - Reason for purchase decision
+ * @property {number} total_cost - Total cost or revenue (price * quantity)
+ * @property {string} note - Reason for transaction decision
  * @property {Date} timestamp - Transaction timestamp
  * @property {string} [transaction_hash] - Locus transaction ID
  */

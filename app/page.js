@@ -256,10 +256,20 @@ export default function Home() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">💸 Total Spent:</span>
-                          <span className="font-bold">${agent.long_term.total_spent.toFixed(2)}</span>
+                          <span className="font-bold text-red-600">${agent.long_term.total_spent.toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">📊 Avg Price:</span>
+                          <span className="text-gray-600">💵 Total Revenue:</span>
+                          <span className="font-bold text-green-600">${agent.long_term.total_revenue.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">📈 Realized Profit:</span>
+                          <span className={`font-bold ${agent.long_term.realized_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {agent.long_term.realized_profit >= 0 ? '+' : ''}${agent.long_term.realized_profit.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">📊 Avg Buy Price:</span>
                           <span className="font-bold">
                             ${agent.long_term.avg_purchase_price > 0 
                               ? agent.long_term.avg_purchase_price.toFixed(4) 
@@ -274,6 +284,8 @@ export default function Home() {
                           <div className="font-semibold text-sm">
                             {lastAction.action === 'buy' 
                               ? `✅ Bought ${lastAction.qty} apples` 
+                              : lastAction.action === 'sell'
+                              ? `💰 Sold ${lastAction.qty} apples`
                               : '⏸️ Waited'}
                           </div>
                           <div className="text-xs text-gray-600 mt-1 italic">
@@ -306,20 +318,36 @@ export default function Home() {
                             {tick.executed_transactions.map((tx) => (
                               <div key={tx.id} className="text-sm text-gray-700">
                                 <div>
-                                  <span className="font-semibold">{tx.agent_name}</span> bought{' '}
-                                  <span className="font-bold">{tx.quantity} 🍎</span> for{' '}
-                                  <span className="text-green-600 font-bold">${tx.total_cost.toFixed(4)}</span>
+                                  <span className="font-semibold">{tx.agent_name}</span>{' '}
+                                  {tx.action === 'buy' ? (
+                                    <>
+                                      <span className="text-blue-600">bought</span>{' '}
+                                      <span className="font-bold">{tx.quantity} 🍎</span> for{' '}
+                                      <span className="text-red-600 font-bold">-${tx.total_cost.toFixed(4)}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="text-orange-600">sold</span>{' '}
+                                      <span className="font-bold">{tx.quantity} 🍎</span> for{' '}
+                                      <span className="text-green-600 font-bold">+${tx.total_cost.toFixed(4)}</span>
+                                    </>
+                                  )}
                                 </div>
                                 {tx.note && (
                                   <div className="text-xs text-gray-500 italic ml-4 mt-0.5">
                                     "{tx.note}"
                                   </div>
                                 )}
+                                {tx.transaction_hash && tx.transaction_hash !== 'N/A' && (
+                                  <div className="text-xs text-gray-400 ml-4 mt-0.5 font-mono">
+                                    🔗 TX: {tx.transaction_hash.substring(0, 16)}...
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <div className="text-sm text-gray-400 italic">No purchases this tick</div>
+                          <div className="text-sm text-gray-400 italic">No transactions this tick</div>
                         )}
                       </div>
                     ))}

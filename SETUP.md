@@ -20,8 +20,15 @@ SKEPTICAL_BUYER_CLIENT_SECRET=your_skeptical_client_secret_here
 # Shared Anthropic API Key (used by all agents)
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
-# Shared Settings
+# Merchant Credentials (for selling apples back to buyers)
+MERCHANT_CLIENT_ID=your_merchant_client_id_here
+MERCHANT_CLIENT_SECRET=your_merchant_client_secret_here
 MERCHANT_WALLET_ADDRESS=0xf1147d10e5d54c5470988eedcf014b1896b60109
+
+# Buyer Wallet Addresses (where merchant sends funds when agents sell)
+FRUGAL_BUYER_ADDRESS=0x_frugal_buyer_wallet_address_here
+IMPULSIVE_BUYER_ADDRESS=0x_impulsive_buyer_wallet_address_here
+SKEPTICAL_BUYER_ADDRESS=0x_skeptical_buyer_wallet_address_here
 
 # Market Configuration
 INITIAL_PRICE=0.02

@@ -18,7 +18,10 @@ export class BaseAgent {
     this.llm = null;
     this.agent = null;
     this.purchaseTool = null;
+    this.sellTool = null;
     this.locusTools = [];
+    this.merchantMCPClient = null;
+    this.merchantTools = [];
     this.currentPrice = 0;
   }
 
@@ -46,8 +49,35 @@ export class BaseAgent {
     this.locusTools = await this.mcpClient.getTools();
     console.log(`   ✓ Connected to Locus MCP (${this.locusTools.length} tools loaded)`);
 
+    // Initialize merchant MCP client (for sell transactions)
+    const merchantClientId = process.env.MERCHANT_CLIENT_ID;
+    const merchantClientSecret = process.env.MERCHANT_CLIENT_SECRET;
+    
+    if (merchantClientId && merchantClientSecret) {
+      console.log(`   🔧 Initializing merchant MCP for selling...`);
+      this.merchantMCPClient = new MCPClientCredentials({
+        mcpServers: {
+          locus: {
+            url: 'https://mcp.paywithlocus.com/mcp',
+            auth: {
+              clientId: merchantClientId,
+              clientSecret: merchantClientSecret,
+            },
+          },
+        },
+      });
+      await this.merchantMCPClient.initializeConnections();
+      this.merchantTools = await this.merchantMCPClient.getTools();
+      console.log(`   ✓ Merchant MCP connected (${this.merchantTools.length} tools loaded)`);
+    } else {
+      console.log(`   ⚠️  Merchant credentials not found - selling will be disabled`);
+    }
+
     // Create custom purchase tool (wraps send_to_address with merchant address locked)
     this.purchaseTool = this.createPurchaseTool();
+    
+    // Create custom sell tool (uses merchant MCP to pay buyer)
+    this.sellTool = this.createSellTool();
 
     // Get the safe read-only tool for checking balance
     const paymentContextTool = this.locusTools.find(t => t.name === 'get_payment_context');
@@ -61,10 +91,11 @@ export class BaseAgent {
     console.log(`   ✓ LLM initialized`);
 
     // SECURITY: Only give agent safe tools:
-    // - purchase_apples: locked to merchant address
+    // - purchase_apples: locked to merchant address, deducts from buyer's funds
+    // - sell_apples: uses merchant MCP to pay buyer, checks inventory, deducts from inventory
     // - get_payment_context: read-only, shows balance
-    // NOT giving: send_to_address, send_to_email (dangerous)
-    const safeTools = [this.purchaseTool];
+    // NOT giving: send_to_address, send_to_email (dangerous - could send to arbitrary addresses)
+    const safeTools = [this.purchaseTool, this.sellTool];
     if (paymentContextTool) {
       safeTools.push(paymentContextTool);
     }
@@ -73,7 +104,7 @@ export class BaseAgent {
       llm: this.llm,
       tools: safeTools,
     });
-    console.log(`   ✓ Agent ready (${safeTools.length} safe tools: purchase + balance check)\n`);
+    console.log(`   ✓ Agent ready (${safeTools.length} safe tools: purchase + sell + balance check)\n`);
   }
 
   /**
@@ -147,6 +178,84 @@ export class BaseAgent {
   }
 
   /**
+   * Create a safe selling tool that uses merchant MCP to pay the buyer
+   * @returns {DynamicStructuredTool}
+   */
+  createSellTool() {
+    return new DynamicStructuredTool({
+      name: 'sell_apples',
+      description: 'Sell apples back to the market. Merchant will send USDC to your wallet. You can only sell what you own.',
+      schema: z.object({
+        quantity: z.number().positive().int().describe('Number of apples to sell (must be <= inventory)'),
+      }),
+      func: async ({ quantity }) => {
+        try {
+          // Check inventory - cannot sell more than owned
+          if (quantity > this.state.inventory) {
+            throw new Error(`Cannot sell ${quantity} apples - you only own ${this.state.inventory}`);
+          }
+
+          // Check DEV_MODE
+          if (process.env.DEV_MODE === 'true') {
+            console.log(`   [DEV MODE] ${this.state.name} would sell ${quantity} apples @ $${this.currentPrice}/unit`);
+            return JSON.stringify({
+              success: true,
+              mock: true,
+              quantity,
+              price: this.currentPrice,
+              total: quantity * this.currentPrice,
+              message: 'DEV MODE: Sale simulated (no real payment)',
+            });
+          }
+
+          // Use pre-initialized merchant MCP tools (same pattern as buy)
+          const merchantSendTool = this.merchantTools.find(t => t.name === 'send_to_address');
+          if (!merchantSendTool) {
+            throw new Error('Merchant send_to_address tool not found - selling disabled');
+          }
+
+          // Get buyer's wallet address from env
+          const buyerAddressKey = `${this.state.personality.toUpperCase()}_BUYER_ADDRESS`;
+          const buyerAddress = process.env[buyerAddressKey];
+          
+          if (!buyerAddress) {
+            throw new Error(`Buyer wallet address not configured (${buyerAddressKey})`);
+          }
+
+          const saleAmount = quantity * this.currentPrice;
+          
+          console.log(`   💰 ${this.state.name} selling ${quantity} apples for $${saleAmount.toFixed(4)} USDC...`);
+          console.log(`   🔒 Payment destination: ${buyerAddress.substring(0, 10)}...`);
+          
+          // Merchant sends funds to buyer using pre-initialized MCP
+          const result = await merchantSendTool.invoke({
+            address: buyerAddress,
+            amount: saleAmount,
+            memo: `${this.state.name}: Sold ${quantity} apples @ $${this.currentPrice}/unit (Tick ${this.state.history.last_tick_seen + 1})`,
+          });
+
+          return JSON.stringify({
+            success: true,
+            quantity,
+            price: this.currentPrice,
+            total: saleAmount,
+            transaction: result,
+            remaining_inventory: this.state.inventory,
+            message: `Successfully sold ${quantity} apples for $${saleAmount.toFixed(4)} USDC`,
+          });
+        } catch (error) {
+          console.error(`   ❌ Sale failed:`, error.message);
+          return JSON.stringify({
+            success: false,
+            error: error.message,
+            message: 'Failed to complete sale',
+          });
+        }
+      },
+    });
+  }
+
+  /**
    * Get the system prompt for this agent (must be implemented by subclasses)
    * @returns {string}
    */
@@ -206,7 +315,8 @@ CURRENT MARKET STATE:
 YOUR STATE:
 - Money: $${this.state.money.toFixed(2)} USDC
 - Inventory: ${this.state.inventory} apples owned
-- Max purchase per tick: ${this.state.preferences.max_qty_per_tick} apples
+- Max Spend per Tick: ${(this.state.preferences.max_spend_percent * 100).toFixed(0)}% of your money ($${(this.state.money * this.state.preferences.max_spend_percent).toFixed(2)})
+- Max Buy Quantity at Current Price: ${Math.floor(this.state.money * this.state.preferences.max_spend_percent / marketState.current_price)} apples
 ${this.state.preferences.threshold ? `- Your price threshold: $${this.state.preferences.threshold.toFixed(4)}` : ''}
 
 RECENT PRICE HISTORY: [${recentPrices.map(p => '$' + p.toFixed(4)).join(', ')}]
@@ -214,32 +324,48 @@ LAST ACTION: ${lastAction ? `${lastAction.action} (${lastAction.qty} apples) - "
 
 YOUR STATISTICS:
 - Total Spent: $${this.state.long_term.total_spent.toFixed(2)} USDC
+- Total Revenue: $${this.state.long_term.total_revenue.toFixed(2)} USDC
+- Realized Profit: ${this.state.long_term.realized_profit >= 0 ? '+' : ''}$${this.state.long_term.realized_profit.toFixed(2)}
 - Total Bought: ${this.state.long_term.total_qty_bought} apples
-- Your Average Price: $${this.state.long_term.avg_purchase_price > 0 ? this.state.long_term.avg_purchase_price.toFixed(4) : '0.0000'}
+- Total Sold: ${this.state.long_term.total_qty_sold} apples
+- Your Average Purchase Price: $${this.state.long_term.avg_purchase_price > 0 ? this.state.long_term.avg_purchase_price.toFixed(4) : '0.0000'}
+- Profit if sold now: ${this.state.inventory > 0 && this.state.long_term.avg_purchase_price > 0 ? 
+    ((marketState.current_price - this.state.long_term.avg_purchase_price) / this.state.long_term.avg_purchase_price * 100).toFixed(1) + '%' : 'N/A'}
 
 DECISION REQUIRED:
-Based on your personality and strategy, decide whether to BUY apples or WAIT this tick.
+Based on your personality and strategy, decide whether to BUY, SELL, or WAIT this tick.
+- BUY: Purchase apples from the market (costs money, limited by your max_spend_percent)
+- SELL: Sell your owned apples back to the market (gain money, can sell up to 8% of inventory)
+- WAIT: Do nothing this tick
 
-IMPORTANT: You are ONLY making a DECISION. Do NOT try to execute the purchase yourself.
+IMPORTANT: You are ONLY making a DECISION. Do NOT try to execute it yourself.
 Just return your decision and the market will handle the execution.
+All orders are MARKET ORDERS (executed immediately at current price).
 
 Return your decision in JSON format wrapped in markdown code fences:
 
 \`\`\`json
-{"action":"buy","quantity":3,"note":"price below threshold"}
+{"action":"buy","quantity":50,"note":"price below threshold, going big"}
 \`\`\`
 
 OR
 
 \`\`\`json
-{"action":"wait","quantity":0,"note":"price too high"}
+{"action":"sell","quantity":20,"note":"price 15% above my avg cost, take profit"}
+\`\`\`
+
+OR
+
+\`\`\`json
+{"action":"wait","quantity":0,"note":"price too high, no profit opportunity"}
 \`\`\`
 
 Remember:
-- You can only afford ${Math.floor(this.state.money / marketState.current_price)} apples max
-- You can buy max ${this.state.preferences.max_qty_per_tick} per tick
+- Your max buy this tick: ${Math.floor(this.state.money * this.state.preferences.max_spend_percent / marketState.current_price)} apples (based on your ${(this.state.preferences.max_spend_percent * 100).toFixed(0)}% budget limit)
+- Your max sell this tick: ${Math.ceil(this.state.inventory * 0.08)} apples (8% of your ${this.state.inventory} inventory)
 - quantity must be 0 if action is "wait"
-- action must be either "buy" or "wait"
+- action must be "buy", "sell", or "wait"
+- Think BIG! Calculate proper quantities based on your budget allocation strategy!
 `;
   }
 
@@ -267,8 +393,13 @@ Remember:
       
       const parsed = JSON.parse(jsonString);
       
+      // Validate action (buy, sell, or wait)
+      let validAction = 'wait';
+      if (parsed.action === 'buy') validAction = 'buy';
+      else if (parsed.action === 'sell') validAction = 'sell';
+      
       return {
-        action: parsed.action === 'buy' ? 'buy' : 'wait',
+        action: validAction,
         quantity: Math.max(0, parseInt(parsed.quantity) || 0),
         note: parsed.note || 'No reason provided',
       };

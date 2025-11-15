@@ -56,7 +56,7 @@ export async function POST(request) {
         inventory: 0,
         preferences: {
           good: 'apple',
-          max_qty_per_tick: 3,
+          max_spend_percent: 0.04, // Can spend up to 4% of balance per tick
           threshold: 0.015,
         },
         history: {
@@ -69,6 +69,9 @@ export async function POST(request) {
           total_qty_bought: 0,
           avg_purchase_price: 0,
           max_single_tick_purchase: 0,
+          total_revenue: 0,
+          total_qty_sold: 0,
+          realized_profit: 0,
         },
         credentials: {
           clientId: process.env.FRUGAL_BUYER_CLIENT_ID,
@@ -86,7 +89,7 @@ export async function POST(request) {
         inventory: 0,
         preferences: {
           good: 'apple',
-          max_qty_per_tick: 5,
+          max_spend_percent: 0.06, // Can spend up to 6% of balance per tick (more aggressive)
         },
         history: {
           prices_seen: [],
@@ -98,6 +101,9 @@ export async function POST(request) {
           total_qty_bought: 0,
           avg_purchase_price: 0,
           max_single_tick_purchase: 0,
+          total_revenue: 0,
+          total_qty_sold: 0,
+          realized_profit: 0,
         },
         credentials: {
           clientId: process.env.IMPULSIVE_BUYER_CLIENT_ID,
@@ -115,7 +121,7 @@ export async function POST(request) {
         inventory: 0,
         preferences: {
           good: 'apple',
-          max_qty_per_tick: 4,
+          max_spend_percent: 0.035, // Can spend up to 3.5% of balance per tick (conservative)
         },
         history: {
           prices_seen: [],
@@ -127,6 +133,9 @@ export async function POST(request) {
           total_qty_bought: 0,
           avg_purchase_price: 0,
           max_single_tick_purchase: 0,
+          total_revenue: 0,
+          total_qty_sold: 0,
+          realized_profit: 0,
         },
         credentials: {
           clientId: process.env.SKEPTICAL_BUYER_CLIENT_ID,
@@ -149,7 +158,8 @@ export async function POST(request) {
       const engine = new MarketEngine(
         initialPrice,
         initialInventory,
-        [frugalState, impulsiveState, skepticalState]
+        [frugalState, impulsiveState, skepticalState],
+        allAgents // Pass agent instances for MCP tool access
       );
 
       setMarketEngine(engine);
@@ -157,7 +167,8 @@ export async function POST(request) {
 
       console.log('📊 Market Engine initialized');
       console.log(`   Price: $${initialPrice}`);
-      console.log(`   Inventory: ${initialInventory} apples\n`);
+      console.log(`   Inventory: ${initialInventory} apples`);
+      console.log(`   💳 Real MCP transactions: ENABLED\n`);
 
       // Initialize all agents
       console.log('🤖 Initializing AI agents...');

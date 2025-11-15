@@ -13,10 +13,21 @@ Watch three AI agents with different personalities buy and sell in a dynamic mar
 Each agent:
 - Has its own Locus MCP wallet
 - Uses Claude AI to make decisions
-- Processes real USDC payments
+- **Executes REAL USDC payments via Locus MCP blockchain**
 - Learns from price history
+- Can buy AND sell apples back to the market
 
 The market price adjusts dynamically based on supply and demand!
+
+### 💳 Real Blockchain Transactions
+
+This simulation executes **actual USDC payments** on every buy/sell:
+- ✅ Buys: Agent → Merchant wallet (via Locus MCP)
+- ✅ Sells: Merchant → Agent wallet (via Locus MCP)
+- ✅ Every transaction gets a blockchain hash
+- ✅ Funds are actually transferred
+
+**⚠️ Use DEV_MODE=true for testing without real payments!**
 
 ## 📋 What You Need
 
