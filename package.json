@@ -1,0 +1,30 @@
+{
+  "name": "fruit-market-sim",
+  "version": "1.0.0",
+  "description": "AI-powered fruit market simulation with 3 autonomous buyer agents",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.10.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/anthropic": "^0.3.7",
+    "@langchain/langgraph": "^0.2.26",
+    "@locus-technologies/langchain-mcp-m2m": "^0.1.0",
+    "zod": "^3.22.4",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6"
+  }
+}
+
