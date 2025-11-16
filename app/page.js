@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Home() {
   const [market, setMarket] = useState(null);
@@ -224,6 +225,81 @@ export default function Home() {
                 <div className="text-xs text-gray-400 mt-1">current round</div>
               </div>
             </div>
+
+            {/* Price Chart */}
+            {market.history && market.history.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900">📈 Price Chart</h2>
+                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart
+                      data={[
+                        // Add tick 0 with initial price (before first transaction)
+                        { tick: 0, price: market.history[0].price_before },
+                        // Then add all ticks with their after-transaction prices
+                        ...market.history.map(tick => ({
+                          tick: tick.tick,
+                          price: tick.price_after,
+                        }))
+                      ]}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis 
+                        dataKey="tick" 
+                        label={{ value: 'Trading Round', position: 'insideBottom', offset: -5 }}
+                        stroke="#6b7280"
+                      />
+                      <YAxis 
+                        label={{ value: 'Price (USDC)', angle: -90, position: 'insideLeft' }}
+                        stroke="#6b7280"
+                        tickFormatter={(value) => `$${value.toFixed(4)}`}
+                      />
+                      <Tooltip 
+                        formatter={(value) => [`$${value.toFixed(4)}`, 'Spot Price']}
+                        labelFormatter={(label) => `Round ${label}`}
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          padding: '8px 12px'
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="price" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        dot={{ fill: '#3b82f6', r: 3 }}
+                        activeDot={{ r: 5, fill: '#2563eb' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <div className="mt-4 text-center">
+                    <div className="text-sm text-gray-600">
+                      {market.history.length > 0 && (
+                        <>
+                          <span className="font-semibold">Change: </span>
+                          <span className={`font-bold ${
+                            market.history[market.history.length - 1].price_after > market.history[0].price_before
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}>
+                            {market.history[market.history.length - 1].price_after > market.history[0].price_before ? '↑' : '↓'}
+                            {' '}
+                            {(((market.history[market.history.length - 1].price_after - market.history[0].price_before) / market.history[0].price_before) * 100).toFixed(2)}%
+                          </span>
+                          <span className="text-gray-400 mx-2">|</span>
+                          <span className="text-gray-600">
+                            From ${market.history[0].price_before.toFixed(4)} to ${market.history[market.history.length - 1].price_after.toFixed(4)}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Agents */}
             <div className="mb-8">
