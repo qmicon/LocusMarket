@@ -65,9 +65,10 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     
-    // Clear completion message when starting new simulation
+    // Clear completion message and market data when starting
     if (action === 'start') {
       setCompletionMessage(null);
+      setMarket(null); // Clear market to show initialization UI
     }
     
     try {
@@ -84,6 +85,7 @@ export default function Home() {
         if (res.status === 409) {
           console.log('⚠️ Simulation already active:', data.message);
           // Don't treat as error, just ignore
+          setIsLoading(false);
           return;
         }
         throw new Error(data.message || 'Failed to ' + action);
@@ -91,19 +93,18 @@ export default function Home() {
 
       setIsRunning(action === 'start');
       
-      // Refresh market data
-      setTimeout(async () => {
-        const marketRes = await fetch('/api/market');
-        if (marketRes.ok) {
-          const marketData = await marketRes.json();
-          setMarket(marketData);
-        }
-      }, 1000);
+      // For start action, wait a bit for first tick to complete
+      if (action === 'start') {
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 2000);
+      } else {
+        setIsLoading(false);
+      }
       
     } catch (err) {
       setError(err.message);
       console.error('Control error:', err);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -434,7 +435,28 @@ export default function Home() {
           </>
         )}
 
-        {!market && !isRunning && (
+        {!market && isLoading && (
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
+            <div className="text-6xl mb-4 animate-bounce">🍎</div>
+            <h2 className="text-2xl font-bold mb-2 text-gray-900">Initializing Exchange...</h2>
+            <p className="text-gray-600 mb-6">
+              Setting up AI traders and connecting to blockchain...
+            </p>
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-ping" style={{ animationDelay: '0.4s' }}></div>
+            </div>
+            <div className="mt-6 text-sm text-gray-500 space-y-2">
+              <div>⚙️ Initializing market engine...</div>
+              <div>🤖 Connecting AI agents to Locus MCP...</div>
+              <div>💰 Fetching wallet balances...</div>
+              <div>🔄 Preparing first trading round...</div>
+            </div>
+          </div>
+        )}
+
+        {!market && !isRunning && !isLoading && (
           <div className="bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
             <div className="text-6xl mb-4">🍎</div>
             <h2 className="text-2xl font-bold mb-2 text-gray-900">Exchange Offline</h2>
